@@ -3,6 +3,11 @@ import '../imports/api/methods';
 import { LinksCollection } from '/imports/api/links';
 import { Cities } from '../imports/api/cities';
 import '../imports/api/methods';
+import { SelectedCity } from '../imports/api/selectedCity';
+
+Meteor.publish('selectedCity', function() {
+  return SelectedCity.find();
+});
 
 Meteor.publish('cities', function () {
   return Cities.find();

@@ -2,12 +2,24 @@ import React, {useEffect, useState} from 'react';
 import { render } from 'react-dom';
 import { Meteor } from 'meteor/meteor';
 import { useTracker } from 'meteor/react-meteor-data';
+import { withTracker } from 'meteor/react-meteor-data';
 import { Cities } from '../imports/api/cities';
 import { CSSTransition } from 'react-transition-group';
-import './main.css';  // Importing CSS for animations
+import './main.css';
+import {SelectedCity} from "../imports/api/selectedCity";  // Importing CSS for animations
 
-const App = () => {
+const App = ({ selectedCity }) => {
     const [isButtonEnabled, setIsButtonEnabled] = useState(false);
+    const [areTogglesActive, setAreTogglesActive] = useState(false);
+    const [isKeyComboPressed, setIsKeyComboPressed] = useState(false);
+    const [isDeleteKeyComboPressed, setIsDeleteKeyComboPressed] = useState(false);
+
+    const handleToggleAll = () => {
+        setAreTogglesActive(prevState => !prevState);  // Toggle the state variable
+        setIsKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
+        setIsDeleteKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
+        setIsButtonEnabled(prevState => !prevState);  // Toggle the button enable/disable state
+    };
     const [name, setName] = useState('');
     const [city1, setCity1] = useState('');
     const [city2, setCity2] = useState('');
@@ -34,15 +46,28 @@ const App = () => {
         const allCities = cities.flatMap(city => city.cities);
         if (allCities.length > 0) {
             const randomCity = allCities[Math.floor(Math.random() * allCities.length)];
+            // [1,2,3]
+            // 0.3 * 3 = 0.9
+            //
             setRandomCity(randomCity);
             console.log(JSON.stringify(Meteor.settings.public));
             const apiKey = Meteor.settings.public.GOOGLE_MAPS_API_KEY;
             console.log("apiKey: " + apiKey);
             setMapUrl(`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(randomCity + ', city')}`);
             setShowRandomCity(true);
+            SelectedCity.update(selectedCity._id, { $set: { name: randomCity, mapUrl } });
         } else {
             alert("No cities submitted yet!");
         }
+    };
+
+    const handleClearSelectedCity = () => {
+        if (selectedCity) {
+            SelectedCity.update(selectedCity._id, { $set: { name: '', mapUrl: '' } });
+        }
+        setRandomCity(undefined);  // Clear the randomCity state
+        setMapUrl(undefined);  // Clear the mapUrl state
+        setShowRandomCity(false);  // Hide the random city and map
     };
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -83,7 +108,7 @@ const App = () => {
                 <input type="text" className="form-control" value={city3} onChange={(e) => setCity3(e.target.value)} placeholder="City 3" />
             </div>
             <button className="btn btn-primary me-2" onClick={handleSubmit}>Submit</button>
-            <PersonList cities={cities} />
+            <PersonList cities={cities} isKeyComboPressed={isKeyComboPressed} isDeleteKeyComboPressed={isDeleteKeyComboPressed}/>
             <div className="mt-5 text-center">
             <button className="btn btn-secondary btn-lg btn-bounce"
                     onClick={handleRandomCity}
@@ -112,14 +137,32 @@ const App = () => {
                         )}
                     </div>
                 </CSSTransition>
+                <button
+                    className="toggle-all-button"
+                    onClick={handleToggleAll}
+                    style={{
+                        position: 'fixed',
+                        bottom: '10px',
+                        right: '10px',
+                        width: '10px',
+                        height: '10px',
+                        border: 'none',
+                        background: 'transparent',
+                        cursor: 'pointer',
+                    }}
+                />
+                {showRandomCity && (
+                    <button onClick={handleClearSelectedCity} className="btn btn-secondary">
+                        Clear Selected City
+                    </button>
+                )}
             </div>
         </div>
     );
 };
 
-const PersonList = ({ cities }) => {
-    const [isKeyComboPressed, setIsKeyComboPressed] = useState(false);
-    const [isDeleteKeyComboPressed, setIsDeleteKeyComboPressed] = useState(false);
+const PersonList = ({ cities, isKeyComboPressed, isDeleteKeyComboPressed }) => {
+
 
     useEffect(() => {
         const handleKeyDown = (e) => {
@@ -186,6 +229,12 @@ const PersonList = ({ cities }) => {
         </div>
     );
 };
+export default withTracker(() => {
+    Meteor.subscribe('selectedCity');
+    return {
+        selectedCity: SelectedCity.findOne(),
+    };
+})(App);
 
 
 Meteor.startup(() => {
