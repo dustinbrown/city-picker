@@ -13,6 +13,8 @@ Meteor.publish('cities', function () {
   return Cities.find();
 });
 
+
+
 async function insertLink({ title, url }) {
   await LinksCollection.insertAsync({ title, url, createdAt: new Date() });
 }
@@ -46,4 +48,8 @@ Meteor.startup(async () => {
   Meteor.publish("links", function () {
     return LinksCollection.find();
   });
+
+  // if (SelectedCity.find().count() === 0) {
+  //   SelectedCity.insert({ name: '', mapUrl: '' });
+  // }
 });

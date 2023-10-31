@@ -2,74 +2,42 @@ import React, {useEffect, useState} from 'react';
 import { render } from 'react-dom';
 import { Meteor } from 'meteor/meteor';
 import { useTracker } from 'meteor/react-meteor-data';
-import { withTracker } from 'meteor/react-meteor-data';
 import { Cities } from '../imports/api/cities';
 import { CSSTransition } from 'react-transition-group';
 import './main.css';
 import {SelectedCity} from "../imports/api/selectedCity";  // Importing CSS for animations
 
-const App = ({ selectedCity }) => {
-    const [isButtonEnabled, setIsButtonEnabled] = useState(false);
-    const [areTogglesActive, setAreTogglesActive] = useState(false);
-    const [isKeyComboPressed, setIsKeyComboPressed] = useState(false);
-    const [isDeleteKeyComboPressed, setIsDeleteKeyComboPressed] = useState(false);
+const App = () => {
+    const { isSubReady, selectedCity } = useTracker(() => {
+        const handle = Meteor.subscribe('selectedCity');
+        console.log("isSubReady: " + handle.ready());
+        console.log("selectedCity: " + JSON.stringify(SelectedCity.findOne()));
+        return {
+            isSubReady: handle.ready(),
+            selectedCity: SelectedCity.findOne(),
+        };
+    });
+    console.log('ALL: ' + JSON.stringify(SelectedCity.find().fetch()));
 
-    const handleToggleAll = () => {
-        setAreTogglesActive(prevState => !prevState);  // Toggle the state variable
-        setIsKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
-        setIsDeleteKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
-        setIsButtonEnabled(prevState => !prevState);  // Toggle the button enable/disable state
-    };
-    const [name, setName] = useState('');
-    const [city1, setCity1] = useState('');
-    const [city2, setCity2] = useState('');
-    const [city3, setCity3] = useState('');
     const cities = useTracker(() => {
         Meteor.subscribe('cities');
         return Cities.find({}).fetch();
     });
-
-    const handleSubmit = () => {
-        Meteor.call('cities.insert', name, [city1, city2, city3]);
-        setName('');
-        setCity1('');
-        setCity2('');
-        setCity3('');
-    };
-
-
-    const [randomCity, setRandomCity] = useState('');
     const [showRandomCity, setShowRandomCity] = useState(false);
-    const [mapUrl, setMapUrl] = useState('');  // New state variable for the map URL
+    const [isButtonEnabled, setIsButtonEnabled] = useState(false);
+    const [areTogglesActive, setAreTogglesActive] = useState(false);
+    const [isKeyComboPressed, setIsKeyComboPressed] = useState(false);
+    const [isDeleteKeyComboPressed, setIsDeleteKeyComboPressed] = useState(false);
+    const [isDeleteButtonDisabled, setIsDeleteButtonDisabled] = useState(true);
 
-    const handleRandomCity = () => {
-        const allCities = cities.flatMap(city => city.cities);
-        if (allCities.length > 0) {
-            const randomCity = allCities[Math.floor(Math.random() * allCities.length)];
-            // [1,2,3]
-            // 0.3 * 3 = 0.9
-            //
-            setRandomCity(randomCity);
-            console.log(JSON.stringify(Meteor.settings.public));
-            const apiKey = Meteor.settings.public.GOOGLE_MAPS_API_KEY;
-            console.log("apiKey: " + apiKey);
-            setMapUrl(`https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(randomCity + ', city')}`);
-            setShowRandomCity(true);
-            SelectedCity.update(selectedCity._id, { $set: { name: randomCity, mapUrl } });
-        } else {
-            alert("No cities submitted yet!");
-        }
-    };
-
-    const handleClearSelectedCity = () => {
-        if (selectedCity) {
-            SelectedCity.update(selectedCity._id, { $set: { name: '', mapUrl: '' } });
-        }
-        setRandomCity(undefined);  // Clear the randomCity state
-        setMapUrl(undefined);  // Clear the mapUrl state
-        setShowRandomCity(false);  // Hide the random city and map
-    };
     useEffect(() => {
+        // console.log("isSubReady: " + isSubReady);
+        // console.log("selectedCity: " + JSON.stringify(selectedCity));
+        // if (isSubReady && selectedCity) {
+        //     setRandomCity(selectedCity.name);
+        //     setMapUrl(selectedCity.mapUrl);
+        //     setShowRandomCity(!!selectedCity.name);  // Set to true if selectedCity.name is not an empty string
+        // }
         const handleKeyDown = (e) => {
             if (e.ctrlKey && e.key === 'a') {
                 window.addEventListener('keydown', handleSubsequentKeyDown);
@@ -89,7 +57,61 @@ const App = ({ selectedCity }) => {
             window.removeEventListener('keydown', handleKeyDown);
             window.removeEventListener('keydown', handleSubsequentKeyDown);
         };
-    }, []);
+    }, [isSubReady, selectedCity]);
+
+    const handleToggleAll = () => {
+        setAreTogglesActive(prevState => !prevState);  // Toggle the state variable
+        setIsKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
+        setIsDeleteKeyComboPressed(prevState => !prevState);  // Toggle the keystroke toggle state
+        setIsButtonEnabled(prevState => !prevState);  // Toggle the button enable/disable state
+        setIsDeleteButtonDisabled(prevState => !prevState);
+    };
+    const [name, setName] = useState('');
+    const [city1, setCity1] = useState('');
+    const [city2, setCity2] = useState('');
+    const [city3, setCity3] = useState('');
+
+
+    const handleSubmit = () => {
+        Meteor.call('cities.insert', name, [city1, city2, city3]);
+        setName('');
+        setCity1('');
+        setCity2('');
+        setCity3('');
+    };
+
+    const handleRandomCity = () => {
+        const allCities = cities.flatMap(city => city.cities);
+        if (allCities.length > 0) {
+            const randomCity = allCities[Math.floor(Math.random() * allCities.length)];
+            console.log(JSON.stringify(Meteor.settings.public));
+            const apiKey = Meteor.settings.public.GOOGLE_MAPS_API_KEY;
+            console.log("apiKey: " + apiKey);
+            let newMapUrl = `https://www.google.com/maps/embed/v1/place?key=${apiKey}&q=${encodeURIComponent(randomCity + ', city')}`;
+            setShowRandomCity(true);
+            Meteor.call('updateSelectedCity', randomCity, newMapUrl);  // Call the Meteor method
+        } else {
+            alert("No cities submitted yet!");
+        }
+    };
+
+    const handleClearSelectedCity = () => {
+        if (isSubReady && selectedCity) {
+            SelectedCity.update(selectedCity._id, { $set: { name: '', mapUrl: '' } });
+            setRandomCity(undefined);  // Clear the randomCity state
+            setMapUrl(undefined);  // Clear the mapUrl state
+            setShowRandomCity(false);  // Hide the random city and map
+        }
+    };
+    const handleDeleteAll = () => {
+        Meteor.call('deleteAllSelectedCities', (error) => {
+            if (error) {
+                console.error('Failed to delete all selected cities:', error);
+            } else {
+                console.log('All selected cities deleted');
+            }
+        });
+    };
 
 
     return (
@@ -110,33 +132,26 @@ const App = ({ selectedCity }) => {
             <button className="btn btn-primary me-2" onClick={handleSubmit}>Submit</button>
             <PersonList cities={cities} isKeyComboPressed={isKeyComboPressed} isDeleteKeyComboPressed={isDeleteKeyComboPressed}/>
             <div className="mt-5 text-center">
+                <button className="btn btn-primary me-2" onClick={handleDeleteAll} disabled={isDeleteButtonDisabled}>Delete All Selected Cities</button>
             <button className="btn btn-secondary btn-lg btn-bounce"
                     onClick={handleRandomCity}
                     disabled={!isButtonEnabled} >
                 Pick Random City</button>
-                <CSSTransition
-                    in={showRandomCity}
-                    timeout={300}
-                    classNames="fade"
-                    unmountOnExit
-                    onExited={() => setShowRandomCity(false)}
-                >
                     <div className="mt-3 text-center">
-                        <div>Random City: {randomCity}</div>
-                        {mapUrl && (
+                        <div>Random City: {selectedCity?.name}</div>
+                        {selectedCity?.mapUrl && (
                             <iframe
                                 width="600"
                                 height="450"
                                 frameBorder="0"
                                 style={{ border: 0 }}
-                                src={mapUrl}
+                                src={selectedCity?.mapUrl}
                                 allowFullScreen=""
                                 aria-hidden="false"
                                 title="Embedded Map"
                             ></iframe>
                         )}
                     </div>
-                </CSSTransition>
                 <button
                     className="toggle-all-button"
                     onClick={handleToggleAll}
@@ -229,12 +244,7 @@ const PersonList = ({ cities, isKeyComboPressed, isDeleteKeyComboPressed }) => {
         </div>
     );
 };
-export default withTracker(() => {
-    Meteor.subscribe('selectedCity');
-    return {
-        selectedCity: SelectedCity.findOne(),
-    };
-})(App);
+export default App;
 
 
 Meteor.startup(() => {

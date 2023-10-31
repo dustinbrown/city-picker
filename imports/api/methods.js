@@ -1,5 +1,6 @@
 import { Meteor } from 'meteor/meteor';
 import { Cities } from './cities';
+import {SelectedCity} from "./selectedCity";
 
 Meteor.methods({
     'cities.insert'(name, cities) {
@@ -14,5 +15,11 @@ Meteor.methods({
             const newVisibility = !person.showCities;
             Cities.update(personId, { $set: { showCities: newVisibility } });
         }
+    },
+    updateSelectedCity(randomCity, mapUrl) {
+        SelectedCity.upsert({ _id: 'selectedCityId' }, { $set: { name: randomCity, mapUrl } });
+    },
+    deleteAllSelectedCities() {
+        SelectedCity.remove({});
     },
 });
